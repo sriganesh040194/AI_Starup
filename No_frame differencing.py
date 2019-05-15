@@ -50,8 +50,8 @@ configPath = os.path.sep.join([args["yolo"], "yolov3.cfg"])
 # load YOLO object detector trained on COCO dataset (80 classes)
 print("[INFO] loading YOLO from disk...")
 net = cv2.dnn.readNetFromDarknet(configPath, weightsPath)
-#net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV);
-#net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU);
+net.setPreferableBackend(cv2.dnn.DNN_BACKEND_HALIDE);
+net.setPreferableTarget(cv2.dnn.DNN_TARGET_OPENCL);
 # initialize the video stream, allow the cammera sensor to warmup,
 # and initialize the FPS counter
 print("[INFO] starting video stream...")
