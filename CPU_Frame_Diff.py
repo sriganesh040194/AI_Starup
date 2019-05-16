@@ -8,18 +8,15 @@ import imutils
 import time
 import cv2
 import os
-prototxt ="MobileNetSSD_deploy.prototxt.txt"
-model="MobileNetSSD_deploy.caffemodel"
-videoFile="Traffic.mp4"
+import datetime
+import Threshold
+
+videoFile="Demo.mp4"
 yolodir="yolo"
-threshold =0.7
+threshold =  Threshold.Threshold(videoFile).get()
 
 # construct the argument parse and parse the arguments
 ap = argparse.ArgumentParser()
-ap.add_argument("-p", "--prototxt", default=prototxt,
-	help="path to Caffe 'deploy' prototxt file")
-ap.add_argument("-m", "--model", default=model,
-	help="path to Caffe pre-trained model")
 ap.add_argument("-y", "--yolo", default=yolodir,
 	help="base path to YOLO directory")
 ap.add_argument("-c", "--confidence", type=float, default=0.5,
@@ -31,28 +28,27 @@ ap.add_argument("-st", "--thresh", default=threshold,
 args = vars(ap.parse_args())
 
 
-# load the COCO class labels our YOLO model was trained on
+# load the COCO labels
 labelsPath = os.path.sep.join([args["yolo"], "coco.names"])
 CLASSES = open(labelsPath).read().strip().split("\n")
  
 COLORS = np.random.uniform(0, 255, size=(len(CLASSES), 3))
 
-# load our serialized model from disk
-print("[INFO] loading model...")
-#net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"])
+print("Model Loading")
 
-
-# derive the paths to the YOLO weights and model configuration
+#paths to the YOLO weights and model configuration
 weightsPath = os.path.sep.join([args["yolo"], "yolov3.weights"])
 configPath = os.path.sep.join([args["yolo"], "yolov3.cfg"])
  
-# load our YOLO object detector trained on COCO dataset (80 classes)
-print("[INFO] loading YOLO from disk...")
 net = cv2.dnn.readNetFromDarknet(configPath, weightsPath)
+
+ln1 = net.getLayerNames()
 # initialize the video stream, allow the cammera sensor to warmup,
 # and initialize the FPS counter
+
 print("[INFO] starting video stream...")
 
+#Input Streams
 #vs = VideoStream(args["sample"]).start()
 #vs = VideoStream(src=0).start()
 vs = FileVideoStream(args["sample"]).start()
@@ -61,102 +57,49 @@ time.sleep(2.0)
 fps = FPS().start()
 old_frame = None
 score=0
-
-# while True:
-# # grab the frame from the threaded video stream and resize it
-# 	# to have a maximum width of 400 pixels
-# 	frame = vs.read()
-# 	try:
-# 		#frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-# 		frame = imutils.resize(frame, width=416, height=416)
-# 		if len(old_frame)!=0:
-# 			(score, diff) = compare_ssim(old_frame[-1], frame, multichannel=True, full=True)
-# 			#diff = (diff * 255).astype("uint8")
-# 			print("SSIM: {}".format(score))
-# 			#old_frame =frame
-# 		if score < 0.6:
-# 			old_frame.append(frame)
-# 			print("Frame Updated")
-# 	except:
-# 		print("Exception")
-# 		break
-# 	print("Done")
-# 	#Frame differencing
-	
 res=None
+
 # loop over the frames from the video stream
 while True:
-	# grab the frame from the threaded video stream and resize it
-	# to have a maximum width of 400 pixels
+	#read each frame from video
 	frame = vs.read()
-	#print(fps._numFrames)
+	if frame is None:
+		break
 	try:
 		frame = imutils.resize(frame, width=416, height=416)
 	except:
 		fps.update()
 		pass
 	#Frame differencing
+	startFrame = datetime.datetime.now()
 	if old_frame is not None:
 		try:
 			(score, diff) = compare_ssim(old_frame, frame, multichannel=True, full=True)
-			print("SSIM: {}".format(score))
 		except:
 			fps.update()
 			pass
 		
 	if score<args["thresh"]:
 		old_frame =frame
-		print("Frame Updated")
-	
-		#frame = type(FileVideoStream)(frame)
-		ln = net.getLayerNames()
-		ln = [ln[i[0] - 1] for i in net.getUnconnectedOutLayers()]
-		# grab the frame dimensions and convert it to a blob
+		
+		ln = [ln1[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 		(h, w) = frame.shape[:2]
-		#blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)),
-		#	0.007843, (300, 300), 127.5)
-		#blob = cv2.dnn.blobFromImage(frame, 0.007843, (300,300), 127.5)
 		blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416),swapRB=True, crop=False)
 
-		# pass the blob through the network and obtain the detections and
 		# predictions
 		net.setInput(blob)
 		detections = net.forward(ln)
 
 		# loop over the detections
-		#for i in np.arange(0, detections.shape[2]):
 		for i in detections:
-			#print(i)
 			for detection in i:
-				#print(detection)
-				# extract the class ID and confidence (i.e., probability)
-				# of the current object detection
 				scores = detection[5:]
-				#print(scores)
-		
 				classID = np.argmax(scores)
-				#print(classID)
 				confidence = scores[classID]
-				#print(confidence)
-				# extract the confidence (i.e., probability) associated with
-				# the prediction
-				#confidence = detections[0, 0, i, 2]
-
-				# filter out weak detections by ensuring the `confidence` is
-				# greater than the minimum confidence
+				# confidence should be greater than the minimum confidence
 				if confidence > args["confidence"]:
-					print(confidence)
-					# extract the index of the class label from the
-					# `detections`, then compute the (x, y)-coordinates of
-					# the bounding box for the object
-					#idx = int(i[0, 0, detection, 1])
-					#box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
-					#print(detection)
 					box = detection[0:4] * np.array([w, h, w, h])
-					#(centerX, centerY, width, height) = box.astype("int")
 					(startX, startY, endX, endY) = box.astype("int")
-					# use the center (x, y)-coordinates to derive the top
-					# and and left corner of the bounding box
 					startX = int(startX - (endX / 2))
 					startY = int(startY - (endY / 2))
 
@@ -164,24 +107,29 @@ while True:
 					label = "{}: {:.2f}%".format(CLASSES[classID], confidence * 100)
 					print(label)
 					color = [int(c) for c in COLORS[classID]]
-					#cv2.rectangle(frame, (startX, startY), (endX, endY), color, 2)
 					cv2.rectangle(frame, (startX, startY), (endX+startX, endY+startY), color, 2)
-					#cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
 					y = startY - 15 if startY - 15 > 15 else startY + 15
 					cv2.putText(frame, label, (startX, y),
 						cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+					endFrame = datetime.datetime.now()
+					frameTime = (endFrame - startFrame).total_seconds()
+					print("Time per frame : ",frameTime)
 		
 		# show the output frame
 		cv2.imshow("Frame", frame)
 		key = cv2.waitKey(1) & 0xFF
-
+	else:
+		endFrame = datetime.datetime.now()
+		frameTime = (endFrame - startFrame).total_seconds()
+		print("Time for frame skip : ",frameTime)
 	# if the `q` key was pressed, break from the loop
 	if key == ord("q"):
 		break
 
 	# update the FPS counter
 	fps.update()
-	print(fps._numFrames)
+	#print(fps._numFrames)
 	#fps._numFrames+=20
     
 
