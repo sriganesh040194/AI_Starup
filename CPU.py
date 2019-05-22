@@ -12,7 +12,7 @@ import time
 import cv2
 import os
 
-videoFile="Demo.mp4"
+videoFile="HighlineGate.mp4"
 yolodir="yolo"
 
 # construct the argument parse and parse the arguments
@@ -69,7 +69,16 @@ while True:
 	ln = [ln1[i[0] - 1] for i in net.getUnconnectedOutLayers()]
 
 	# convert it to a blob
+	channel = frame.shape[2:]
 	(h, w) = frame.shape[:2]
+
+	#To make sure that the frame is of 3 channels
+	if channel[0] < 3:
+		dim = np.zeros((234,416))
+		frame = np.stack((frame,dim, dim), axis=2)
+	#frame_cm = cv2.applyColorMap(frame,cv2.COLORMAP_WINTER)
+	#frame = frame_cm.astype('uint8')
+	#frame = cv2.cvtColor(frame,cv2.COLOR_GRAY2RGB)
 	blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416),swapRB=True, crop=False)
 
 	# predictions
