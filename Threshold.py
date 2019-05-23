@@ -15,7 +15,7 @@ class Threshold:
             return 0.99
         elif self.filename == "Traffic2.mp4":
             return 0.7
-        return 0.96
+        return 0.9
         
 
 

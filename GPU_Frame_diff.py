@@ -12,7 +12,7 @@ import datetime
 from pydarknet import Detector, Image
 import Threshold
 
-videoFile="Traffic.mp4"
+videoFile="HighlineGate.mp4"
 yolodir="yolo"
 threshold =  Threshold.Threshold(videoFile).get()
 
@@ -72,12 +72,18 @@ while True:
 	except:
 		fps.update()
 		pass
+	
+	#To make sure that the frame is of 3 channels
+	channel = frame.shape[2:]
+	if channel[0] < 3:
+		dim = np.zeros((234,416))
+		frame = np.stack((frame,dim, dim), axis=2)
 	#Frame differencing
 	if old_frame is not None:
 		try:
 			(score, diff) = compare_ssim(old_frame, frame, multichannel=True, full=True)
 		except:
-			fps.update()
+			fps.update
 			pass
 		
 	if score<args["thresh"]:
